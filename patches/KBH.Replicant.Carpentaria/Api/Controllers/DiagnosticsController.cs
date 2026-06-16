@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Security.Principal;
+using KBH.Replicant.Carpentaria.Application.Interfaces;
+using KBH.Replicant.Carpentaria.Application.Statics;
 using Microsoft.AspNetCore.Mvc;
 
 namespace KBH.Replicant.Carpentaria.Api.Controllers;
@@ -8,38 +10,39 @@ namespace KBH.Replicant.Carpentaria.Api.Controllers;
 [ApiController]
 public class DiagnosticsController : ControllerBase
 {
+    private readonly IPersonalAccessTokenService _tokenService;
+
+    public DiagnosticsController(IPersonalAccessTokenService tokenService)
+    {
+        _tokenService = tokenService;
+    }
+
+    /// <summary>
+    /// Muestra el usuario Windows que está llamando al API, su dominio y si tiene PAT configurado.
+    /// </summary>
     [HttpGet("whoami")]
     public IActionResult WhoAmI()
     {
-        var windowsIdentity = HttpContext.User.Identity as WindowsIdentity;
+        var identity = HttpContext.User.Identity as WindowsIdentity;
 
-        var info = new
+        string fullName   = identity?.Name ?? HttpContext.User.Identity?.Name ?? "anónimo";
+        string domain     = fullName.Contains('\\') ? fullName.Split('\\')[0] : Environment.UserDomainName;
+        string userName   = fullName.Contains('\\') ? fullName.Split('\\')[1] : fullName;
+
+        string pat        = _tokenService.GetMasterToken();
+        bool   hasPat     = !string.IsNullOrEmpty(pat);
+
+        return Ok(new
         {
-            AuthenticationType   = HttpContext.User.Identity?.AuthenticationType ?? "ninguna",
-            IsAuthenticated      = HttpContext.User.Identity?.IsAuthenticated ?? false,
-            UserName             = windowsIdentity?.Name ?? HttpContext.User.Identity?.Name ?? "anónimo",
-            IsImpersonating      = windowsIdentity?.ImpersonationLevel.ToString() ?? "N/A",
-            OS                   = RuntimeInformation.OSDescription,
-            AppPoolUser          = Environment.UserDomainName + "\\" + Environment.UserName,
-            HasKbhPat            = HasCredential("KBH_PAT", windowsIdentity),
-        };
-
-        return Ok(info);
-    }
-
-    private bool HasCredential(string key, WindowsIdentity? identity)
-    {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            return false;
-        if (identity == null)
-            return false;
-
-        bool found = false;
-        WindowsIdentity.RunImpersonated(identity.AccessToken, () =>
-        {
-            string? val = KBH.Replicant.Carpentaria.Application.Statics.WindowsCredentialManager.GetCredential(key);
-            found = !string.IsNullOrEmpty(val);
+            domain,
+            userName,
+            isAuthenticated   = identity?.IsAuthenticated ?? false,
+            authenticatedWith = identity?.AuthenticationType ?? "ninguna",
+            pat = new
+            {
+                found   = hasPat,
+                preview = hasPat ? $"{pat[..4]}...{pat[^4..]}" : "—",
+            },
         });
-        return found;
     }
 }
