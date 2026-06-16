@@ -1,6 +1,7 @@
 using KBH.Replicant.Carpentaria.Application;
 using KBH.Replicant.Carpentaria.Application.Interfaces;
 using KBH.Replicant.Carpentaria.Application.Services;
+using Microsoft.AspNetCore.Authentication.Negotiate;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,7 +11,10 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddAuthentication(Microsoft.AspNetCore.Server.IISIntegration.IISDefaults.AuthenticationScheme);
+// Negotiate funciona tanto en Kestrel (local) como en IIS (servidor)
+builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
+    .AddNegotiate();
+builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
 
 // Scoped: cada request obtiene el PAT del usuario Windows que llama
@@ -42,6 +46,8 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
+app.UseAuthentication();   // ← identifica quién llama
+app.UseAuthorization();    // ← verifica permisos
 app.MapControllers();
 
 app.Run();
