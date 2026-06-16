@@ -2,6 +2,7 @@
 using KBH.Replicant.Carpentaria.Application.Statics;
 using Microsoft.Extensions.Logging;
 using Microsoft.TeamFoundation.Build.WebApi;
+using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.DistributedTask.WebApi;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.ReleaseManagement.WebApi;
@@ -43,6 +44,12 @@ public class AzureDevopsService : IAzureDevopsService
             _cachedPat = currentPat;
         }
         return _vssConnection;
+    }
+
+    public async Task<IEnumerable<TeamProjectReference>> GetProjects()
+    {
+        var projectClient = GetConnection().GetClient<ProjectHttpClient>();
+        return await projectClient.GetProjects();
     }
 
     public async Task<Build?> GetBuild(string projectName, int buildId)
