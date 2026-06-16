@@ -1,98 +1,114 @@
 ﻿using System.Runtime.InteropServices;
+using System.Security.Principal;
 using KBH.Replicant.Carpentaria.Application.Interfaces;
 using KBH.Replicant.Carpentaria.Application.Statics;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
 namespace KBH.Replicant.Carpentaria.Application.Services;
 
 public class PersonalAccessTokenService : IPersonalAccessTokenService
 {
-    private Dictionary<string, string> _credentials = new Dictionary<string, string>();
     private readonly ILogger<PersonalAccessTokenService> _logger;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private const string _KBH_PAT = "KBH_PAT";
 
-    public PersonalAccessTokenService(ILogger<PersonalAccessTokenService> logger)
+    public PersonalAccessTokenService(
+        ILogger<PersonalAccessTokenService> logger,
+        IHttpContextAccessor httpContextAccessor)
     {
         _logger = logger;
+        _httpContextAccessor = httpContextAccessor;
     }
 
-    public string GetMasterToken()
+    public string GetMasterToken() => ResolveCredentialAsCallingUser(_KBH_PAT);
+
+    public string GetProjectToken(string projectName) =>
+        ResolveCredentialAsCallingUser($"KBH_PAT_{projectName}");
+
+    // Lee la credencial impersonando al usuario Windows que hizo el request,
+    // de modo que accede a SU propio Windows Credential Manager.
+    private string ResolveCredentialAsCallingUser(string key)
     {
-        string token = ResolveCredential(_KBH_PAT);
-        string domain = Environment.UserDomainName;
-        string user = Environment.UserName;
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            _logger.LogWarning("Windows Credential Manager solo está disponible en Windows.");
+            return string.Empty;
+        }
+
+        var windowsIdentity = _httpContextAccessor.HttpContext?.User.Identity as WindowsIdentity;
+        if (windowsIdentity == null)
+        {
+            _logger.LogWarning(
+                "No se pudo obtener la identidad Windows del request. ¿Está habilitada la autenticación Windows en IIS?"
+            );
+            return string.Empty;
+        }
+
+        string result = string.Empty;
+        WindowsIdentity.RunImpersonated(windowsIdentity.AccessToken, () =>
+        {
+            result = WindowsCredentialManager.GetCredential(key) ?? string.Empty;
+        });
+
         _logger.LogInformation(
-            "PAT para {User}@{Domain}: {Status}",
-            user, domain,
-            string.IsNullOrEmpty(token) ? "NO ENCONTRADO" : "encontrado"
+            "PAT '{Key}' para {User}: {Status}",
+            key, windowsIdentity.Name,
+            string.IsNullOrEmpty(result) ? "NO ENCONTRADO en Credential Manager" : "encontrado"
         );
-        if (string.IsNullOrEmpty(token))
+
+        if (string.IsNullOrEmpty(result))
             _logger.LogWarning(
-                "No se encontró el PAT '{Name}' en Credential Manager ni en variables de entorno.",
-                _KBH_PAT
+                "El usuario {User} no tiene '{Key}' en su Windows Credential Manager.",
+                windowsIdentity.Name, key
             );
-        return token;
-    }
 
-    public string GetProjectToken(string projectName)
-    {
-        if (_credentials.TryGetValue(projectName, out string? token))
-            return token;
-
-        token = ResolveCredential($"KBH_PAT_{projectName}");
-        _credentials[projectName] = token;
-        if (string.IsNullOrEmpty(token))
-            _logger.LogWarning("No personal access token found for {Name}.", projectName);
-        return token;
-    }
-
-    // Busca la credencial en: 1) Windows Credential Manager, 2) Variable de entorno
-    private string ResolveCredential(string key)
-    {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            string? fromManager = WindowsCredentialManager.GetCredential(key);
-            if (!string.IsNullOrEmpty(fromManager))
-            {
-                _logger.LogDebug("Credencial '{Key}' obtenida desde Windows Credential Manager.", key);
-                return fromManager;
-            }
-            _logger.LogWarning(
-                "Credencial '{Key}' no encontrada en Windows Credential Manager (usuario: {User}@{Domain}). Intentando variable de entorno.",
-                key, Environment.UserName, Environment.UserDomainName
-            );
-        }
-
-        string? fromEnv = Environment.GetEnvironmentVariable(key);
-        if (!string.IsNullOrEmpty(fromEnv))
-        {
-            _logger.LogDebug("Credencial '{Key}' obtenida desde variable de entorno.", key);
-            return fromEnv;
-        }
-
-        return string.Empty;
+        return result;
     }
 
     public bool Save(TokenDTO tokenDTO)
     {
-        _logger.LogInformation("Patch TokenDTO: {Target}", tokenDTO.Target);
+        _logger.LogInformation("Guardando token: {Target}", tokenDTO.Target);
         if (!tokenDTO.Target.StartsWith("KBH_"))
+            _logger.LogWarning("El target '{Target}' no es de carpentaria", tokenDTO.Target);
+
+        var windowsIdentity = _httpContextAccessor.HttpContext?.User.Identity as WindowsIdentity;
+        if (windowsIdentity != null)
         {
-            _logger.LogWarning("El target a crear no es de carpentaria");
+            // Guarda en el Credential Manager del usuario que llama
+            WindowsIdentity.RunImpersonated(windowsIdentity.AccessToken, () =>
+            {
+                WindowsCredentialManager.SaveCredential(tokenDTO.Target, "Carpentaria", tokenDTO.Value);
+            });
         }
-        WindowsCredentialManager.SaveCredential(tokenDTO.Target, "Carpentaria", tokenDTO.Value);
+        else
+        {
+            WindowsCredentialManager.SaveCredential(tokenDTO.Target, "Carpentaria", tokenDTO.Value);
+        }
         return true;
     }
 
     public bool Delete(string target)
     {
-        _logger.LogInformation("Delete TokenDTO: {Target}", target);
+        _logger.LogInformation("Eliminando token: {Target}", target);
         if (!target.StartsWith("KBH_"))
         {
-            _logger.LogWarning("El target a eliminar no es de carpentaria");
+            _logger.LogWarning("El target '{Target}' no es de carpentaria", target);
             return false;
         }
-        WindowsCredentialManager.DeleteCredential(target);
+
+        var windowsIdentity = _httpContextAccessor.HttpContext?.User.Identity as WindowsIdentity;
+        if (windowsIdentity != null)
+        {
+            WindowsIdentity.RunImpersonated(windowsIdentity.AccessToken, () =>
+            {
+                WindowsCredentialManager.DeleteCredential(target);
+            });
+        }
+        else
+        {
+            WindowsCredentialManager.DeleteCredential(target);
+        }
         return true;
     }
 }
