@@ -43,7 +43,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSwagger();
-app.UseSwaggerUI();
+app.UseSwaggerUI(c =>
+{
+    // Necesario para que Swagger mande las credenciales Windows (Negotiate)
+    c.ConfigObject.AdditionalItems["withCredentials"] = true;
+});
 
 app.UseHttpsRedirection();
 app.UseAuthentication();   // ← identifica quién llama
