@@ -5,7 +5,7 @@ import { useMonth } from '@/lib/month';
 import { Avatar, Button, Group, MonthPicker, NavButton, Progress, Ring, Row, Screen } from '@/components/ui';
 import { Gear } from '@/components/icons';
 import { money, pct } from '@/lib/format';
-import { monthLabel, relativeDays, shortDate } from '@/lib/dates';
+import { monthLabel, relativeDays, shortDate, todayISO } from '@/lib/dates';
 import { alerts, budgetStatus, cardSummary, debtMonthlyTotal, debtToIncome, expensesByCategory, healthScore, householdIncomeEstimate, monthSummary, upcomingPayments, goalProgress } from '@/lib/finance';
 import { CATEGORIES, type ExpenseCategory } from '@/lib/types';
 import { CATEGORY_COLORS } from '@/lib/colors';
@@ -111,9 +111,9 @@ export function Home() {
       )}
 
       {pendingFixed.length > 0 && isCurrent && (
-        <Group header="Gastos fijos pendientes" footer="Al registrarlos se descuentan del mes y, si van a tarjeta, se suman a su saldo." action={{ label: 'Registrar todos', onClick: () => dispatch({ type: 'registerFixed', fixedIds: pendingFixed.map((f) => f.id), date: new Date().toISOString().slice(0, 10) }) }}>
+        <Group header="Gastos fijos pendientes" footer="Al registrarlos se descuentan del mes y, si van a tarjeta, se suman a su saldo." action={{ label: 'Registrar todos', onClick: () => dispatch({ type: 'registerFixed', fixedIds: pendingFixed.map((f) => f.id), date: todayISO() }) }}>
           {pendingFixed.slice(0, 5).map((f) => (
-            <Row key={f.id} icon={CATEGORIES[f.category].emoji} iconColor={CATEGORY_COLORS[f.category]} label={f.name} sub={`Día ${f.dayOfMonth}`} value={money(f.amount)} onClick={() => dispatch({ type: 'registerFixed', fixedIds: [f.id], date: new Date().toISOString().slice(0, 10) })} right={<span className="badge blue">Registrar</span>} />
+            <Row key={f.id} icon={CATEGORIES[f.category].emoji} iconColor={CATEGORY_COLORS[f.category]} label={f.name} sub={`Día ${f.dayOfMonth}`} value={money(f.amount)} onClick={() => dispatch({ type: 'registerFixed', fixedIds: [f.id], date: todayISO() })} right={<span className="badge blue">Registrar</span>} />
           ))}
           {pendingFixed.length > 5 && <Row label={`${pendingFixed.length - 5} más…`} onClick={() => nav.push({ name: 'fixed' })} chevron />}
         </Group>

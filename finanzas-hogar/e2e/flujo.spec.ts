@@ -46,7 +46,7 @@ test('flujo completo: familia, tarjeta Nu, gasto, pago y plan', async ({ page })
   await page.getByTestId('card-limit').fill('25000');
   await page.getByTestId('card-used').fill('4200');
   await page.getByTestId('card-cut').fill('20');
-  await page.getByTestId('card-pay').fill('10');
+  await page.getByTestId('card-payday').fill('10');
   await page.screenshot({ path: `${SHOTS}/04-nueva-tarjeta-nu.png` });
   await page.getByTestId('card-save-btn').click();
   await expect(page.locator('.cc.full')).toHaveCount(1);

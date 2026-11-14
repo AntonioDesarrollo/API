@@ -388,7 +388,7 @@ export function CardForm({ id }: { id?: string }) {
 
       <Group header="Fechas" footer="Día del mes en que corta tu tarjeta y día límite para pagar sin intereses.">
         <NumberField label="Día de corte" value={cutDay} min={1} max={31} onChange={setCutDay} testId="card-cut" />
-        <NumberField label="Día límite de pago" value={payDay} min={1} max={31} onChange={setPayDay} testId="card-pay" />
+        <NumberField label="Día límite de pago" value={payDay} min={1} max={31} onChange={setPayDay} testId="card-payday" />
       </Group>
       <div className="mt24">
         <Button block onClick={save} disabled={!valid} testId="card-save-btn">
