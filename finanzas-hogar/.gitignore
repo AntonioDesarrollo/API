@@ -1,0 +1,14 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+gradle-build.log
+*.tmp.mjs
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+android/local.properties
+android/.idea/
+android/*.iml
+android/app/*.iml

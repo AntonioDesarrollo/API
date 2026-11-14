@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Finanzas del Hogar</string>
+    <string name="title_activity_main">Finanzas del Hogar</string>
+    <string name="package_name">mx.hogar.finanzas</string>
+    <string name="custom_url_scheme">mx.hogar.finanzas</string>
+</resources>
