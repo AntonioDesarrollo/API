@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { api, ApiError } from '@/lib/api'
 import { getAccessToken } from '@/lib/auth'
 import type { Device, Track } from '@/lib/types'
+import { isNative } from '@/lib/native'
 import { usePrefs } from './prefs'
 import { toast } from './toast'
 
@@ -309,9 +310,15 @@ function targetDevice(get: Get): string | undefined {
   return s.sdkDeviceId ?? undefined
 }
 
+let elementActivated = false
 /** Si no hay dispositivo activo pero nuestro SDK está listo, lo activa. */
 async function ensureDevice(get: Get, set: Set) {
   const s = get()
+  // En móvil/WebView el audio necesita un gesto del usuario: lo hacemos en el primer play.
+  if (sdkPlayer && !elementActivated && (isNative || /Android|iPhone|iPad/i.test(navigator.userAgent))) {
+    elementActivated = true
+    await sdkPlayer.activateElement().catch(() => undefined)
+  }
   if (s.activeDevice?.id) return
   if (s.sdkDeviceId) {
     try {

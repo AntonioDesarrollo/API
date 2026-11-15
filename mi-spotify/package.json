@@ -10,12 +10,17 @@
     "icons": "node scripts/make-icons.mjs"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/browser": "^8.0.5",
+    "@capacitor/core": "^8.6.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.0",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/cli": "^8.6.2",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/spotify-web-playback-sdk": "^0.1.19",

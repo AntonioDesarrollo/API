@@ -3,6 +3,7 @@ import { redirectUri } from '@/lib/auth'
 import { useAuth } from '@/store/auth'
 import { toast } from '@/store/toast'
 import { I } from '@/components/Icons'
+import { isNative } from '@/lib/native'
 
 const DASHBOARD = 'https://developer.spotify.com/dashboard'
 
@@ -20,7 +21,7 @@ export function Setup() {
       <ol className="small">
         <li>Entra a <a href={DASHBOARD} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', fontWeight: 700 }}>developer.spotify.com/dashboard</a> con tu cuenta de Spotify.</li>
         <li>Pulsa <b>Create app</b>. Nombre y descripción libres.</li>
-        <li>En <b>Redirect URIs</b> pega exactamente esta dirección:
+        <li>En <b>Redirect URIs</b> pega exactamente esta dirección{isNative ? ' (es la de la app Android; si usas también la versión web, añade su URL aparte)' : ''}:
           <div className="copy-row" style={{ marginTop: 6 }}>
             <code className="inline">{uri}</code>
             <button className="icon-btn" onClick={copy} aria-label="Copiar"><I.Copy /></button>

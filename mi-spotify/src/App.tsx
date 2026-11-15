@@ -15,6 +15,9 @@ import { QueuePage } from '@/pages/Queue'
 import { Search } from '@/pages/Search'
 import { Settings } from '@/pages/Settings'
 import { Setup } from '@/pages/Setup'
+import { Bridge } from '@/pages/Bridge'
+import { isNative } from '@/lib/native'
+import { App as CapApp } from '@capacitor/app'
 import { useAuth } from '@/store/auth'
 import { usePlayer } from '@/store/player'
 import { usePrefs } from '@/store/prefs'
@@ -45,6 +48,18 @@ function Shell() {
   useEffect(() => {
     init()
   }, [init])
+  // Botón "atrás" de Android: cierra "ahora suena", si no, navega atrás; en la raíz sale.
+  useEffect(() => {
+    if (!isNative) return
+    const sub = CapApp.addListener('backButton', ({ canGoBack }) => {
+      if (usePlayer.getState().nowPlayingOpen) return usePlayer.getState().setNowPlayingOpen(false)
+      if (canGoBack && window.location.hash !== '#/' && window.location.hash !== '') window.history.back()
+      else CapApp.exitApp()
+    })
+    return () => {
+      sub.then((h) => h.remove())
+    }
+  }, [])
   const links = [
     { to: '/', label: 'Inicio', icon: <I.Home /> },
     { to: '/search', label: 'Buscar', icon: <I.Search /> },
@@ -91,6 +106,7 @@ export default function App() {
   return (
     <HashRouter>
       {status === 'loading' && <div className="spinner" style={{ marginTop: '30vh' }} />}
+      {status === 'bridge' && <Bridge />}
       {status === 'setup' && <Setup />}
       {status === 'anon' && <Login />}
       {status === 'ok' && <Shell />}

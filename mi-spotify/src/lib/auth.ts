@@ -1,3 +1,6 @@
+import { App } from '@capacitor/app'
+import { Browser } from '@capacitor/browser'
+import { isNative, NATIVE_REDIRECT } from './native'
 import { codeChallenge, randomString } from './pkce'
 
 export const SCOPES = [
@@ -21,6 +24,7 @@ export const SCOPES = [
 
 const K = {
   clientId: 'ondas.clientId',
+  nativeRedirect: 'ondas.nativeRedirect',
   verifier: 'ondas.pkce.verifier',
   state: 'ondas.pkce.state',
   tokens: 'ondas.tokens',
@@ -30,8 +34,23 @@ export interface Tokens { access_token: string; refresh_token: string; expires_a
 
 /** URL a la que Spotify regresa después del login: la raíz de la app (sin hash). */
 export function redirectUri(): string {
+  if (isNative) return getNativeRedirect()
   const base = import.meta.env.BASE_URL || '/'
   return `${window.location.origin}${base.endsWith('/') ? base : base + '/'}`
+}
+
+/**
+ * En el APK el redirect por defecto es ondas://callback. Si Spotify rechazara el esquema
+ * propio, el usuario puede poner aquí la URL https de la versión web, que hace de puente
+ * y reenvía el código a la app (ver handleRedirect).
+ */
+export function getNativeRedirect(): string {
+  return localStorage.getItem(K.nativeRedirect) || NATIVE_REDIRECT
+}
+export function setNativeRedirect(url: string) {
+  const v = url.trim()
+  if (v) localStorage.setItem(K.nativeRedirect, v)
+  else localStorage.removeItem(K.nativeRedirect)
 }
 
 export function getClientId(): string {
@@ -60,9 +79,12 @@ export async function beginLogin(): Promise<void> {
   const clientId = getClientId()
   if (!clientId) throw new Error('Falta el Client ID')
   const verifier = randomString(64)
-  const state = randomString(16)
-  sessionStorage.setItem(K.verifier, verifier)
-  sessionStorage.setItem(K.state, state)
+  // El prefijo "app-" avisa a la versión web que debe reenviar el código al APK.
+  const state = (isNative ? 'app-' : '') + randomString(16)
+  // En el APK usamos localStorage: el navegador del sistema abre aparte y sessionStorage se pierde.
+  const store = isNative ? localStorage : sessionStorage
+  store.setItem(K.verifier, verifier)
+  store.setItem(K.state, state)
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: clientId,
@@ -72,21 +94,52 @@ export async function beginLogin(): Promise<void> {
     redirect_uri: redirectUri(),
     state,
   })
-  window.location.assign(`https://accounts.spotify.com/authorize?${params}`)
+  const url = `https://accounts.spotify.com/authorize?${params}`
+  if (isNative) await Browser.open({ url, presentationStyle: 'popover' })
+  else window.location.assign(url)
+}
+
+let nativeListenerReady = false
+/**
+ * En el APK, Android abre la app con ondas://callback?code=... al terminar el login.
+ * Aquí lo escuchamos y lo convertimos en tokens.
+ */
+export function listenNativeRedirect(onDone: (ok: boolean, error?: string) => void) {
+  if (!isNative || nativeListenerReady) return
+  nativeListenerReady = true
+  App.addListener('appUrlOpen', async ({ url }) => {
+    if (!url.startsWith(NATIVE_REDIRECT)) return
+    try {
+      await Browser.close().catch(() => undefined)
+      const ok = await handleRedirect(url)
+      onDone(ok)
+    } catch (e) {
+      onDone(false, e instanceof Error ? e.message : String(e))
+    }
+  })
+}
+
+/** Devuelve true si la URL actual es un login iniciado por el APK que la web debe reenviar. */
+export function isBridgeRedirect(): boolean {
+  const url = new URL(window.location.href)
+  return !isNative && !!url.searchParams.get('code') && (url.searchParams.get('state') || '').startsWith('app-')
 }
 
 /** Si la URL trae ?code=..., lo intercambia por tokens. Devuelve true si hubo login. */
-export async function handleRedirect(): Promise<boolean> {
-  const url = new URL(window.location.href)
+export async function handleRedirect(rawUrl = window.location.href): Promise<boolean> {
+  const url = new URL(rawUrl)
   const code = url.searchParams.get('code')
   const err = url.searchParams.get('error')
   if (!code && !err) return false
-  const cleanUrl = url.origin + url.pathname + (url.hash || '')
-  window.history.replaceState({}, '', cleanUrl)
+  if (!isNative) {
+    const cleanUrl = url.origin + url.pathname + (url.hash || '')
+    window.history.replaceState({}, '', cleanUrl)
+  }
   if (err) throw new Error(`Spotify rechazó el login: ${err}`)
-  const expected = sessionStorage.getItem(K.state)
+  const store = isNative ? localStorage : sessionStorage
+  const expected = store.getItem(K.state)
   if (expected && url.searchParams.get('state') !== expected) throw new Error('El estado del login no coincide (posible CSRF)')
-  const verifier = sessionStorage.getItem(K.verifier)
+  const verifier = store.getItem(K.verifier)
   if (!verifier) throw new Error('No se encontró el verificador PKCE; vuelve a iniciar sesión')
   const body = new URLSearchParams({
     client_id: getClientId(),
@@ -108,8 +161,8 @@ export async function handleRedirect(): Promise<boolean> {
     expires_at: Date.now() + data.expires_in * 1000,
     scope: data.scope,
   })
-  sessionStorage.removeItem(K.verifier)
-  sessionStorage.removeItem(K.state)
+  store.removeItem(K.verifier)
+  store.removeItem(K.state)
   return true
 }
 

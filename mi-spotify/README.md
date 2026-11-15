@@ -44,7 +44,33 @@ La forma más sencilla es publicarla en GitHub Pages (ya hay un workflow en `.gi
 3. Añade esa URL (con la barra final) a los Redirect URIs de tu app en el dashboard de Spotify.
 4. Ábrela en Chrome en el teléfono → menú → **Instalar app** / **Añadir a pantalla de inicio**.
 
-Para generar un `.apk` nativo se puede envolver esta misma app con Capacitor; la PWA ya cubre el uso diario.
+## 4. APK para Android
+
+El proyecto ya incluye la app Android (carpeta `android/`, generada con Capacitor). El workflow `.github/workflows/build-apk.yml` la compila en GitHub Actions cada vez que cambia `mi-spotify/` y deja el archivo en dos sitios:
+
+- **Releases** → `apk-latest` → `ondas-player.apk` (enlace directo de descarga).
+- **Actions** → el run → artefacto `ondas-player-apk`.
+
+Instálalo en el teléfono (permite "instalar apps de origen desconocido" para Chrome o tu gestor de archivos).
+
+Para que el login funcione en el APK registra en el dashboard de Spotify este Redirect URI:
+
+```
+ondas://callback
+```
+
+La app abre Spotify en el navegador del sistema y Android vuelve a la app con ese enlace. Si el dashboard rechazara el esquema `ondas://`, en Ajustes de la app puedes poner como redirect la URL https de la versión web publicada (GitHub Pages): esa página solo reenvía el código a la app.
+
+Compilar en tu PC (requiere Android Studio o el SDK de Android y Java 21):
+
+```bash
+npm run build
+npx cap sync android
+cd android && ./gradlew assembleDebug
+# APK en android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Reproducción dentro del APK: el Web Playback SDK corre en el WebView de Android y puede funcionar, pero no está garantizado por Spotify en móvil. Si no suena, usa el botón de dispositivos para mandar la música a la app oficial de Spotify del teléfono; el APK sigue siendo el control con tus estilos.
 
 ## Notas y límites
 

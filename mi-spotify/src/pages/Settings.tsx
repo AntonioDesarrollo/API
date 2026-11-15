@@ -3,6 +3,8 @@ import { I } from '@/components/Icons'
 import { useAuth } from '@/store/auth'
 import { usePrefs, type Density, type CoverSize, type HomeSection, type NavPosition } from '@/store/prefs'
 import { toast } from '@/store/toast'
+import { isNative, NATIVE_REDIRECT } from '@/lib/native'
+import { getNativeRedirect, setNativeRedirect } from '@/lib/auth'
 import { FONTS, THEMES, type FontId, type Mode } from '@/themes/themes'
 
 const ACCENTS = ['#1ed760', '#0a84ff', '#ff3cac', '#ff8c32', '#d0bcff', '#00e5ff', '#ff453a', '#ffd60a', '#30d158', '#bf5af2']
@@ -39,6 +41,7 @@ export function Settings() {
   const { user, logout, saveClientId, clientId } = useAuth()
   const fileRef = useRef<HTMLInputElement>(null)
   const [json, setJson] = useState('')
+  const [nativeRedirect, setNativeRedirectState] = useState(getNativeRedirect())
 
   const exportPrefs = () => {
     const blob = new Blob([p.exportJson()], { type: 'application/json' })
@@ -154,6 +157,11 @@ export function Settings() {
         <Row label={user?.display_name ?? 'Usuario'} hint={`${user?.product === 'premium' ? 'Spotify Premium' : user?.product ?? ''} · ${user?.email ?? ''}`}>
           <button className="btn sm outline" onClick={logout}><I.Logout width={16} height={16} /> Cerrar sesión</button>
         </Row>
+        {isNative && (
+          <Row label="Redirect URI del login" hint={`Normalmente ${NATIVE_REDIRECT}. Si Spotify rechaza el esquema, pon aquí la URL https de tu versión web publicada (hace de puente).`}>
+            <input className="input" style={{ width: 240 }} value={nativeRedirect} onChange={(e) => setNativeRedirectState(e.target.value)} onBlur={() => { setNativeRedirect(nativeRedirect); toast('Redirect guardado; úsalo también en el dashboard de Spotify') }} spellCheck={false} />
+          </Row>
+        )}
         <Row label="Client ID" hint={clientId}>
           <button className="btn sm outline" onClick={() => { logout(); saveClientId('') }}>Cambiar</button>
         </Row>
